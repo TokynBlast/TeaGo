@@ -10,13 +10,7 @@
 #include <random>
 
 #define uint8 uint8_t
-#define uint16 uint16_t
-#define uint32 uint32_t
 #define uint64 uint64_t
-#define int8 int8_t
-#define int16 int16_t
-#define int32 int32_t
-#define int64 int64_t
 
 #define MAX_VARS 36
 #define JMP_INT_SIZE uint64
@@ -473,3 +467,4 @@ int main(int argc, char* argv[]) {
   vars.fill(false);
   RunCode();
 }
+
