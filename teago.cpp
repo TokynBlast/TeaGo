@@ -11,7 +11,8 @@
 
 // These are the only two we use.
 #define uint8 uint8_t               // numbers
-#define uint64 uint64_t             // position and jump
+#define str char[255]               // String variables
+#define uint64 uint64_t             // position and jump num size
 
 #define MAX_VARS 36
 #define JMP_INT_SIZE uint64
@@ -494,4 +495,5 @@ int main(int argc, char *argv[])
   vars.fill(false);
   RunCode();
 }
+
 
