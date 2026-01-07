@@ -26,13 +26,21 @@ using Var = std::variant<
 // The variables :D
 std::array<Var, MAX_VARS> variables;
 
+// Which ones are available :)
 std::array<bool, MAX_VARS> vars;
+
+// pointer to current posistion :3
 uint64 pos = 0;
+
+// Used as trackers for certain things
+// Should use local instead of global
 std::string str_pender;
 std::string name;
 
+// file contents
 std::string code;
 
+// For errors :)
 inline std::string rand_chooser(std::vector<std::string> list)
 {
   std::random_device dev;
@@ -42,7 +50,9 @@ inline std::string rand_chooser(std::vector<std::string> list)
   return list[chosen];
 }
 
-std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> getVar(const std::string &name)
+// Get the contents of a variable, and it's location
+std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>>
+getVar(const std::string &name)
 {
   for (int i = 0; i < MAX_VARS; i++)
   {
@@ -65,10 +75,10 @@ std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> getVa
         return std::make_pair(static_cast<uint8>(i), iv.second); // return the index and integer value
     }
   }
-
   return false;
 }
 
+// Finds the lowest open slot in the array of variables
 inline uint8 findFreeSlot()
 {
   for (uint8 i = 0; i < MAX_VARS; i++)
@@ -89,6 +99,7 @@ inline bool nextIs(const std::string &kw)
   return false;
 }
 
+// Skip WS
 inline void skip()
 {
   while (pos < code.size() && (code[pos] == ' ' || code[pos] == '\n'))
@@ -97,6 +108,7 @@ inline void skip()
   }
 }
 
+// Turn a string into an int
 inline std::variant<bool, uint8> toInt(const std::string &str)
 {
   try
@@ -116,11 +128,13 @@ inline std::variant<bool, uint8> toInt(const std::string &str)
   return false;
 }
 
+// Main code loop
 int RunCode()
 {
   while (pos < code.size())
   {
     skip();
+    // Makes variables
     if (nextIs("teach"))
     {
       name.clear();
@@ -201,10 +215,12 @@ int RunCode()
       if (std::holds_alternative<std::pair<uint8, std::string>>(spot))
       {
         vars[std::get<std::pair<uint8, std::string>>(spot).first] = false;
+        variables[std::get<std::pair<uint8, std::string>>(spot).second] = ""
       }
       else if (std::holds_alternative<std::pair<uint8, uint8>>(spot))
       {
         vars[std::get<std::pair<uint8, uint8>>(spot).first] = false;
+        variables[std::get<std::pair<uint8, uint8>>(spot).second] = ""
       }
       continue;
     }
@@ -478,3 +494,4 @@ int main(int argc, char *argv[])
   vars.fill(false);
   RunCode();
 }
+
