@@ -8,21 +8,69 @@
 #include <array>
 #include <algorithm>
 #include <random>
+#include <cstring>
 
 // These are the only two we use.
-#define uint8 uint8_t               // numbers
-#define str char[255]               // String variables
-#define uint64 uint64_t             // position and jump num size
+#define uint8 uint8_t   // numbers
+#define uint64 uint64_t // position and jump num size
 
 #define MAX_VARS 36
 #define JMP_INT_SIZE uint64
 
 namespace fs = std::filesystem;
 
+// Wrapper for char[255] to use in variant/pair
+struct str {
+  char data[255];
+
+  str() { data[0] = '\0'; }
+
+  str(const str& s) {
+    std::strcpy(data, s.data);
+  }
+
+  str(const std::string& s) {
+    size_t len = s.length();
+    if (len > 254) len = 254;
+    std::memcpy(data, s.c_str(), len);
+    data[len] = '\0';
+  }
+
+  str(const char* s) {
+    size_t len = std::strlen(s);
+    if (len > 254) len = 254;
+    std::memcpy(data, s, len);
+    data[len] = '\0';
+  }
+
+  const char* c_str() const { return data; }
+  size_t length() const { return std::strlen(data); }
+
+  void clear() { data[0] = '\0'; }
+  bool empty() const { return data[0] == '\0'; }
+
+  str& operator+=(char c) {
+    size_t len = length();
+    if (len < 254) {  // Leave room for null terminator
+      data[len] = c;
+      data[len + 1] = '\0';
+    }
+    return *this;
+  }
+
+  bool operator==(const std::string& s) const { return std::strcmp(data, s.c_str()) == 0; }
+  bool operator==(const str& other) const { return std::strcmp(data, other.data) == 0; }
+};
+
+// Allow outputting str to std::ostream
+inline std::ostream& operator<<(std::ostream& os, const str& s) {
+  return os << s.data;
+}
+
 // The possible types in the language
 using Var = std::variant<
-    std::pair<std::string, std::string>,
-    std::pair<std::string, uint8>>;
+    std::pair<str, str>,
+    std::pair<str, uint8>>;
 
 // The variables :D
 std::array<Var, MAX_VARS> variables;
@@ -35,8 +83,8 @@ uint64 pos = 0;
 
 // Used as trackers for certain things
 // Should use local instead of global
-std::string str_pender;
-std::string name;
+str str_pender;
+str name;
 
 // file contents
 std::string code;
@@ -52,8 +100,8 @@ inline std::string rand_chooser(std::vector<std::string> list)
 }
 
 // Get the contents of a variable, and it's location
-std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>>
-getVar(const std::string &name)
+std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>>
+getVar(const str &name)
 {
   for (int i = 0; i < MAX_VARS; i++)
   {
@@ -61,17 +109,17 @@ getVar(const std::string &name)
       continue;
 
     // string variable
-    if (std::holds_alternative<std::pair<std::string, std::string>>(variables[i]))
+    if (std::holds_alternative<std::pair<str, str>>(variables[i]))
     {
-      auto &arr = std::get<std::pair<std::string, std::string>>(variables[i]);
+      auto &arr = std::get<std::pair<str, str>>(variables[i]);
       if (arr.first == name)
         return std::make_pair(static_cast<uint8>(i), arr.second); // return the index and string value
     }
 
     // integer variable
-    if (std::holds_alternative<std::pair<std::string, uint8>>(variables[i]))
+    if (std::holds_alternative<std::pair<str, uint8>>(variables[i]))
     {
-      auto &iv = std::get<std::pair<std::string, uint8>>(variables[i]);
+      auto &iv = std::get<std::pair<str, uint8>>(variables[i]);
       if (iv.first == name)
         return std::make_pair(static_cast<uint8>(i), iv.second); // return the index and integer value
     }
@@ -110,14 +158,14 @@ inline void skip()
 }
 
 // Turn a string into an int
-inline std::variant<bool, uint8> toInt(const std::string &str)
+inline std::variant<bool, uint8> toInt(const str &stri)
 {
   try
   {
     size_t idx = 0;
-    int num = std::stoi(str, &idx);
+    int num = std::stoi(stri.c_str(), &idx);
     // Check if entire string was consumed
-    if (idx == str.length())
+    if (idx == stri.length())
     {
       return static_cast<uint8>(num);
     }
@@ -148,15 +196,15 @@ int RunCode()
       }
 
       // Check if variable already exists (for reassignment)
-      std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> spot = getVar(name);
+      std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>> spot = getVar(name);
       int slot = -1;
 
       if (!std::holds_alternative<bool>(spot))
       {
         // Variable exists - get its slot for reassignment (type-unsafe!)
-        if (std::holds_alternative<std::pair<uint8, std::string>>(spot))
+        if (std::holds_alternative<std::pair<uint8, str>>(spot))
         {
-          slot = std::get<std::pair<uint8, std::string>>(spot).first;
+          slot = std::get<std::pair<uint8, str>>(spot).first;
         }
         else if (std::holds_alternative<std::pair<uint8, uint8>>(spot))
         {
@@ -197,7 +245,7 @@ int RunCode()
         {
           str_pender = "0";
         }
-        uint8 number = static_cast<uint8>(std::stoi(str_pender));
+        uint8 number = static_cast<uint8>(std::stoi(str_pender.c_str()));
         vars[slot] = true;
         variables[slot] = std::make_pair(name, number);
       }
@@ -212,16 +260,20 @@ int RunCode()
         name += code[pos];
         pos++;
       }
-      std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> spot = getVar(name);
-      if (std::holds_alternative<std::pair<uint8, std::string>>(spot))
+      std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>> spot = getVar(name);
+      if (std::holds_alternative<std::pair<uint8, str>>(spot))
       {
-        vars[std::get<std::pair<uint8, std::string>>(spot).first] = false;
-        variables[std::get<std::pair<uint8, std::string>>(spot).second] = ""
+        uint8 idx = std::get<std::pair<uint8, str>>(spot).first;
+        vars[idx] = false;
+        // Clear the name so it can't be accessed
+        std::get<std::pair<str, str>>(variables[idx]).first = str("");
       }
       else if (std::holds_alternative<std::pair<uint8, uint8>>(spot))
       {
-        vars[std::get<std::pair<uint8, uint8>>(spot).first] = false;
-        variables[std::get<std::pair<uint8, uint8>>(spot).second] = ""
+        uint8 idx = std::get<std::pair<uint8, uint8>>(spot).first;
+        vars[idx] = false;
+        // Clear the name so it can't be accessed
+        std::get<std::pair<str, uint8>>(variables[idx]).first = str("");
       }
       continue;
     }
@@ -265,12 +317,12 @@ int RunCode()
           name += code[pos];
           pos++;
         }
-        std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> varPrint = getVar(name);
+        std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>> varPrint = getVar(name);
         if (!std::holds_alternative<bool>(varPrint))
         {
-          if (std::holds_alternative<std::pair<uint8, std::string>>(varPrint))
+          if (std::holds_alternative<std::pair<uint8, str>>(varPrint))
           {
-            std::cout << std::get<std::pair<uint8, std::string>>(varPrint).second;
+            std::cout << std::get<std::pair<uint8, str>>(varPrint).second.data;
           }
           else if (std::holds_alternative<std::pair<uint8, uint8>>(varPrint))
           {
@@ -294,7 +346,7 @@ int RunCode()
         name += code[pos];
         pos++;
       }
-      JMP_INT_SIZE jmpCount = name.empty() ? 1 : static_cast<JMP_INT_SIZE>(std::stoi(name));
+      JMP_INT_SIZE jmpCount = name.empty() ? 1 : static_cast<JMP_INT_SIZE>(std::stoi(name.c_str()));
       skip();
       JMP_INT_SIZE jmpStart = pos;
 
@@ -334,14 +386,14 @@ int RunCode()
               pos++;
             }
 
-            std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> spot = getVar(name);
+            std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>> spot = getVar(name);
             int slot = -1;
 
             if (!std::holds_alternative<bool>(spot))
             {
-              if (std::holds_alternative<std::pair<uint8, std::string>>(spot))
+              if (std::holds_alternative<std::pair<uint8, str>>(spot))
               {
-                slot = std::get<std::pair<uint8, std::string>>(spot).first;
+                slot = std::get<std::pair<uint8, str>>(spot).first;
               }
               else if (std::holds_alternative<std::pair<uint8, uint8>>(spot))
               {
@@ -383,7 +435,7 @@ int RunCode()
               {
                 str_pender = "0";
               }
-              uint8 number = static_cast<uint8>(std::stoi(str_pender));
+              uint8 number = static_cast<uint8>(std::stoi(str_pender.c_str()));
               vars[slot] = true;
               variables[slot] = std::make_pair(name, number);
             }
@@ -428,12 +480,12 @@ int RunCode()
                 name += code[pos];
                 pos++;
               }
-              std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> varPrint = getVar(name);
+              std::variant<bool, std::pair<uint8, str>, std::pair<uint8, uint8>> varPrint = getVar(name);
               if (!std::holds_alternative<bool>(varPrint))
               {
-                if (std::holds_alternative<std::pair<uint8, std::string>>(varPrint))
+                if (std::holds_alternative<std::pair<uint8, str>>(varPrint))
                 {
-                  std::cout << std::get<std::pair<uint8, std::string>>(varPrint).second;
+                  std::cout << std::get<std::pair<uint8, str>>(varPrint).second.data;
                 }
                 else if (std::holds_alternative<std::pair<uint8, uint8>>(varPrint))
                 {
@@ -495,5 +547,3 @@ int main(int argc, char *argv[])
   vars.fill(false);
   RunCode();
 }
-
-
