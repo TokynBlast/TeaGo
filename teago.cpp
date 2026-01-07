@@ -17,15 +17,9 @@
 
 namespace fs = std::filesystem;
 
-// Change to a pair
-struct integers {
-    std::string value;
-    uint8 number;
-};
-
 using Var = std::variant<
-    std::array<std::string, 2>,
-    integers
+    std::pair<std::string, std::string>,
+    std::pair<uint8, uint8>
 >;
 
 std::array<Var, MAX_VARS> variables;
@@ -467,4 +461,5 @@ int main(int argc, char* argv[]) {
   vars.fill(false);
   RunCode();
 }
+
 
