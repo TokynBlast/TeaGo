@@ -9,22 +9,23 @@
 #include <algorithm>
 #include <random>
 
-#define uint8 uint8_t
-#define uint64 uint64_t
+// These are the only two we use.
+#define uint8 uint8_t               // numbers
+#define uint64 uint64_t             // position and jump
 
 #define MAX_VARS 36
 #define JMP_INT_SIZE uint64
 
 namespace fs = std::filesystem;
 
+// The possible types in the language
 using Var = std::variant<
     std::pair<std::string, std::string>,
-    std::pair<uint8, uint8>
->;
+    std::pair<std::string, uint8>>;
 
+// The variables :D
 std::array<Var, MAX_VARS> variables;
 
-uint8 num_vars = 0;
 std::array<bool, MAX_VARS> vars;
 uint64 pos = 0;
 std::string str_pender;
@@ -32,7 +33,8 @@ std::string name;
 
 std::string code;
 
-inline std::string rand_chooser(std::vector<std::string> list) {
+inline std::string rand_chooser(std::vector<std::string> list)
+{
   std::random_device dev;
   std::mt19937 randomness_generator(dev());
   std::uniform_int_distribution<std::size_t> index_distribution(0, list.size() - 1);
@@ -40,68 +42,82 @@ inline std::string rand_chooser(std::vector<std::string> list) {
   return list[chosen];
 }
 
-std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> getVar(const std::string& name) {
+std::variant<bool, std::pair<uint8, std::string>, std::pair<uint8, uint8>> getVar(const std::string &name)
+{
   for (int i = 0; i < MAX_VARS; i++)
   {
     if (!vars[i])
       continue;
 
     // string variable
-    if (std::holds_alternative<std::array<std::string, 2>>(variables[i]))
+    if (std::holds_alternative<std::pair<std::string, std::string>>(variables[i]))
     {
-      auto &arr = std::get<std::array<std::string, 2>>(variables[i]);
-      if (arr[0] == name)
-        return std::make_pair(static_cast<uint8>(i), arr[1]); // return the index and string value
+      auto &arr = std::get<std::pair<std::string, std::string>>(variables[i]);
+      if (arr.first == name)
+        return std::make_pair(static_cast<uint8>(i), arr.second); // return the index and string value
     }
 
     // integer variable
-    if (std::holds_alternative<integers>(variables[i]))
+    if (std::holds_alternative<std::pair<std::string, uint8>>(variables[i]))
     {
-      auto &iv = std::get<integers>(variables[i]);
-      if (iv.value == name)
-        return std::make_pair(static_cast<uint8>(i), iv.number); // return the index and integer value
+      auto &iv = std::get<std::pair<std::string, uint8>>(variables[i]);
+      if (iv.first == name)
+        return std::make_pair(static_cast<uint8>(i), iv.second); // return the index and integer value
     }
   }
 
   return false;
 }
 
-inline uint8 findFreeSlot() {
-  for (uint8 i = 0; i < MAX_VARS; i++) {
-    if (!vars[i]) return i;
+inline uint8 findFreeSlot()
+{
+  for (uint8 i = 0; i < MAX_VARS; i++)
+  {
+    if (!vars[i])
+      return i;
   }
   return MAX_VARS + 1;
 }
 
-inline bool nextIs(const std::string& kw) {
-  if(code.compare(pos, kw.size(), kw) == 0) {
+inline bool nextIs(const std::string &kw)
+{
+  if (code.compare(pos, kw.size(), kw) == 0)
+  {
     pos += kw.size();
     return true;
   }
   return false;
 }
 
-inline void skip() {
-  while (pos < code.size() && (code[pos] == ' ' || code[pos] == '\n')) {
+inline void skip()
+{
+  while (pos < code.size() && (code[pos] == ' ' || code[pos] == '\n'))
+  {
     pos++;
   }
 }
 
-inline std::variant<bool, uint8> toInt(const std::string& str) {
-  try {
+inline std::variant<bool, uint8> toInt(const std::string &str)
+{
+  try
+  {
     size_t idx = 0;
     int num = std::stoi(str, &idx);
     // Check if entire string was consumed
-    if (idx == str.length()) {
+    if (idx == str.length())
+    {
       return static_cast<uint8>(num);
     }
-  } catch (...) {
+  }
+  catch (...)
+  {
     // Not a valid integer
   }
   return false;
 }
 
-int RunCode() {
+int RunCode()
+{
   while (pos < code.size())
   {
     skip();
@@ -141,7 +157,6 @@ int RunCode() {
           std::cerr << rand_chooser(std::vector<std::string>{"GO TO SRO NOW! TOO MANY VARIABLES!", "That's too many variables. Too bad this ain't 1976...", "Out of my classroom. Now."});
           break;
         }
-        num_vars++;
       }
 
       skip();
@@ -153,7 +168,7 @@ int RunCode() {
           pos++;
         }
         vars[slot] = true;
-        variables[slot] = std::array<std::string, 2>{name, str_pender};
+        variables[slot] = std::make_pair(name, str_pender);
         pos++;
       }
       else
@@ -169,7 +184,7 @@ int RunCode() {
         }
         uint8 number = static_cast<uint8>(std::stoi(str_pender));
         vars[slot] = true;
-        variables[slot] = integers{name, number};
+        variables[slot] = std::make_pair(name, number);
       }
       continue;
     }
@@ -287,7 +302,8 @@ int RunCode() {
         while (pos < jmpEnd)
         {
           skip();
-          if (pos >= jmpEnd) break;
+          if (pos >= jmpEnd)
+            break;
 
           // Process the main commands inline
           if (nextIs("teach"))
@@ -323,7 +339,6 @@ int RunCode() {
                 std::cerr << rand_chooser(std::vector<std::string>{"GO TO SRO NOW! TOO MANY VARIABLES!", "That's too many variables. Too bad this ain't 1976...", "Out of my classroom. Now."});
                 return 1;
               }
-              num_vars++;
             }
 
             skip();
@@ -336,7 +351,7 @@ int RunCode() {
                 pos++;
               }
               vars[slot] = true;
-              variables[slot] = std::array<std::string, 2>{name, str_pender};
+              variables[slot] = std::make_pair(name, str_pender);
               pos++;
             }
             else
@@ -353,7 +368,7 @@ int RunCode() {
               }
               uint8 number = static_cast<uint8>(std::stoi(str_pender));
               vars[slot] = true;
-              variables[slot] = integers{name, number};
+              variables[slot] = std::make_pair(name, number);
             }
           }
           else if (nextIs("write"))
@@ -417,7 +432,7 @@ int RunCode() {
           }
           else
           {
-            break;  // Unknown command or end of loop
+            break; // Unknown command or end of loop
           }
         }
       }
@@ -440,26 +455,26 @@ int RunCode() {
   return 0;
 }
 
-int main(int argc, char* argv[]) {
-  if (argc < 2) {
+int main(int argc, char *argv[])
+{
+  if (argc < 2)
+  {
     std::cerr << "No classroom provided (no file)";
     return 1;
   }
 
   std::ifstream f(argv[1]);
-  if (!f.is_open()) {
+  if (!f.is_open())
+  {
     std::cerr << "Could not open door to classroom (file)";
     return 1;
   }
 
   code.assign(
-    (std::istreambuf_iterator<char>(f)),
-    std::istreambuf_iterator<char>()
-  );
+      (std::istreambuf_iterator<char>(f)),
+      std::istreambuf_iterator<char>());
 
   // Set all variables as open :)
   vars.fill(false);
   RunCode();
 }
-
-
